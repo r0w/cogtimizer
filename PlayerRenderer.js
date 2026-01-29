@@ -132,7 +132,12 @@ class PlayerRenderer {
             shScaled
         );
 
-        return this._player.canvas.toDataURL();
+        try {
+            return this._player.canvas.toDataURL();
+        } catch (e) {
+            // Canvas is tainted due to cross-origin images
+            return "icons/head.png";
+        }
     }
 }
 
