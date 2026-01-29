@@ -222,7 +222,7 @@ class CogInventory {
             const eqName = slots[i];
             if (eqName.indexOf("Hats") !== -1) {
               const match = eqName.match(/EquipmentHats(\d+)(?:_x1)?/);
-              if (match.length === 2) {
+              if (match && match.length === 2) {
                 const index = parseInt(match[1]);
                 hatIcons[v] = {
                   type: "hat",
