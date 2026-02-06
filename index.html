@@ -49,27 +49,6 @@
           <button id="load" style="max-width: 15ch;">Load</button>
         </div>
       </div>
-      <div class="inputarea" style="margin-top: 1.5em; padding-top: 1em; border-top: 1px solid #444;">
-        <h3 style="margin-top: 0;">Comparison test (pre vs post optimization)</h3>
-        <p>
-          <label for="testDataFile">Select <code>data.json</code> (or leave empty and use "Load" above first)</label><br />
-          <input type="file" id="testDataFile" accept=".json" />
-        </p>
-        <p>
-          <label for="testSolveTime">Solve time (ms)</label>
-          <input type="number" id="testSolveTime" value="5000" min="1000" step="1000" style="width:8ch" />
-        </p>
-        <p>
-          Weights: Build <input type="number" id="testBuildRate" value="2" style="width:5ch" />
-          EXP <input type="number" id="testExpBonus" value="50" style="width:5ch" />
-          Flaggy <input type="number" id="testFlaggy" value="5" style="width:5ch" />
-          Steps penalty <input type="number" id="testStepsPenalty" value="5" min="0" style="width:5ch" title="Prefer fewer moves (0 = ignore)" />
-        </p>
-        <p>
-          <button id="runComparisonTest">Run comparison test</button>
-        </p>
-        <div id="comparisonResult" style="margin-top: 1em; display: none;"></div>
-      </div>
     </div>
       <div id="result">
         <div id="notify">
@@ -117,10 +96,6 @@
           <p>
             <label for="solveTime">Solve times (ms)</label><br />
             <input type="number" id="solveTime" value="2500" style="width:10ch"></input>
-          </p>
-          <p>
-            <label for="stepsPenalty">Steps penalty (prefer fewer moves; 0 = ignore)</label><br />
-            <input type="number" id="stepsPenalty" value="5" min="0" style="width:6ch"></input>
           </p>
           <h4>Misc.</h4>
           <hr />
@@ -377,7 +352,6 @@
       }
 
       function load(save) {
-        g.best = null;
         cogInvetory.load(save);
         console.log("Loading");
         // Fetch Gem-Shop flaggy upgrades
@@ -400,7 +374,7 @@
         document.getElementById("xpbonus").innerText = mmoifyNumber(initScore.expBonus, false) + "%";
         document.getElementById("flaggyrate").innerText = mmoifyNumber(initScore.flaggy, false) + "/HR";
         
-        for (let oneOption of [...OPTIMIZABLE, "solveTime", "stepsPenalty"]) {
+        for (let oneOption of [...OPTIMIZABLE, "solveTime"]) {
           const val = localStorage.getItem(oneOption);
           if (val) {
             document.getElementById(oneOption).value = val;
@@ -512,7 +486,7 @@
         localStorage.setItem("buildRate", buildRate);
         localStorage.setItem("expBonus", expBonus);
         localStorage.setItem("flaggy", flaggy);
-        solver.setWeights(getInput("buildRate"), getInput("expBonus"), getInput("flaggy"), getInput("stepsPenalty") || 0);
+        solver.setWeights(getInput("buildRate"), getInput("expBonus"), getInput("flaggy"));
         const best = await solver.solve(cogInvetory, solveTime);
         document.getElementById("end").innerText = `Final BuildRate: ${best.score.buildRate}, EXP: ${best.score.expBonus}, Flaggy: ${best.score.flaggy}`;
         
@@ -556,67 +530,6 @@
       });
       document.getElementById("cogbtn").addEventListener("click", () => {
         openCogTab();
-      });
-
-      document.getElementById("runComparisonTest").addEventListener("click", async () => {
-        const fileInput = document.getElementById("testDataFile");
-        const resultDiv = document.getElementById("comparisonResult");
-        resultDiv.style.display = "block";
-        resultDiv.innerHTML = "<p>Loading and optimizing…</p>";
-
-        try {
-          let save = null;
-          if (fileInput.files.length > 0) {
-            const text = await fileInput.files[0].text();
-            save = JSON.parse(text);
-            if (save.data && typeof save.data === "object") save = save.data;
-            load(save);
-          } else if (Object.keys(cogInvetory.cogs).length === 0) {
-            resultDiv.innerHTML = "<p style='color:#c44'>Load data first (paste JSON and click Load, or select data.json above).</p>";
-            return;
-          }
-
-          const solveTime = Number(document.getElementById("testSolveTime").value) || 5000;
-          const wBuild = Number(document.getElementById("testBuildRate").value) || 2;
-          const wExp = Number(document.getElementById("testExpBonus").value) || 50;
-          const wFlaggy = Number(document.getElementById("testFlaggy").value) || 5;
-          const wStepsPenalty = Number(document.getElementById("testStepsPenalty").value) || 0;
-
-          const before = { ...cogInvetory.score };
-          resultDiv.innerHTML = "<p>Optimizing… (this may take " + (solveTime / 1000) + "s)</p>";
-
-          solver.setWeights(wBuild, wExp, wFlaggy, wStepsPenalty);
-          const best = await solver.solve(cogInvetory, solveTime);
-          const after = { ...best.score };
-          const optimalSteps = f.getOptimalSteps(best.board, best.cogs);
-          const stepsRequired = optimalSteps.length;
-
-          const delta = (key) => (after[key] ?? 0) - (before[key] ?? 0);
-          const fmt = (n) => typeof n === "number" ? (n >= 1000000 ? (n / 1e6).toFixed(2) + "M" : n >= 1000 ? (n / 1000).toFixed(2) + "K" : Math.round(n)) : n;
-          const row = (label, key, suffix = "") => {
-            const d = delta(key);
-            const sign = d > 0 ? "+" : "";
-            return "<tr><td>" + label + "</td><td>" + fmt(before[key]) + suffix + "</td><td>" + fmt(after[key]) + suffix + "</td><td>" + sign + fmt(d) + suffix + "</td></tr>";
-          };
-          const stepsRow = "<tr><td>Steps to apply</td><td>0</td><td>" + stepsRequired + "</td><td>+" + stepsRequired + "</td></tr>";
-
-          resultDiv.innerHTML =
-            "<h4>Pre- vs post-optimization</h4>" +
-            "<p><strong>Weights:</strong> Build rate " + wBuild + ", EXP bonus " + wExp + ", Flaggy " + wFlaggy + (wStepsPenalty ? ", Steps penalty " + wStepsPenalty : "") + "</p>" +
-            "<table border='1' cellpadding='8' cellspacing='0' style='border-collapse:collapse; max-width:420px'>" +
-            "<thead><tr><th>Metric</th><th>Before</th><th>After</th><th>Delta</th></tr></thead><tbody>" +
-            row("Build rate", "buildRate", "/hr") +
-            row("EXP bonus", "expBonus", "%") +
-            row("Flaggy rate", "flaggy", "/hr") +
-            row("EXP boost (players)", "expBoost", "") +
-            row("Flag boost", "flagBoost", "") +
-            stepsRow +
-            "</tbody></table>" +
-            "<p>Steps to apply optimized layout: <strong>" + stepsRequired + "</strong> (swap/move operations from current board to optimized).</p>";
-        } catch (e) {
-          resultDiv.innerHTML = "<p style='color:#c44'>Error: " + (e.message || e) + "</p>";
-          console.error(e);
-        }
       });
     </script>
   </body>

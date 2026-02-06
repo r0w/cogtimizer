@@ -244,7 +244,7 @@ class CogInventory {
     }
 
     // Fetch Gem-Shop flaggy upgrades
-    this.flaggyShopUpgrades = (JSON.parse(save["GemItemsPurchased"] || "[0]")[118]) || 0;
+    this.flaggyShopUpgrades = JSON.parse(save["GemItemsPurchased"])[118];
     // Fetch the list of available cogs
     const cogRaw = JSON.parse(save["CogM"]);
     const cogIcons = JSON.parse(save["CogO"]).map(c=>{
